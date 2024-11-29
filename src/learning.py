@@ -6,73 +6,115 @@ class Data:
     def __init__(self, file_name):
         # Extraindo informações do arquivo
         self.file_name = file_name
-        self.data = np.loadtxt(file_name, delimiter=',')
-        self.data = self.data.T
+        self.data = np.loadtxt(file_name, delimiter=',').T
         self.p, self.N = self.data.shape
         self.X = self.data[:self.p - 1, :]
         self.Y = self.data[self.p - 1, :]
         self.categories = list(set(self.Y))
 
-    def show_graph(self):
-        # Gerando gráfico com base nas informações
-        plt.title(f"Gráfico gerado à partir dos dados do {self.file_name}.")
-
-        for category in self.categories:
-            # Desenhar pontos no gráficos
-            plt.scatter(self.X[0, self.Y == category],
-                        self.X[1, self.Y == category],  edgecolors='k',
-                        label=f'Categoria {int(category)}')
-
-        # Definir limites visuais dos eixos x e y
-        plt.xlim(np.min(self.X[0, :]) - .5, np.max(self.X[0, :]) + .5)
-        plt.ylim(np.min(self.X[1, :]) - .5, np.max(self.X[1, :]) + .5)
-
-        # Fazer desenho da reta inicial
-        plt.plot(
-            [np.min(self.X[0, :]), np.max(self.X[0, :])],
-            [np.min(self.X[1, :]), np.max(self.X[1, :])],
-            color='red'
-        )
-        plt.xlabel(r'$X_1$')
-        plt.ylabel(r'$X_2$')
-        plt.legend()
-        plt.show()
-
 
 class ModelsRNA:
     '''
-        Classe para implementar funções que representam modelos de redes 
+        Classe para implementar funções que representam modelos de redes
         neurais artificiais.
     '''
+
     @staticmethod
-    def perceptron_simples(X, Y, etha):
+    def perceptron_simples(X, Y, etha, max_epocas):
         p, N = X.shape
-        X = np.concatenate((
-            -np.ones((1, N)),
-            X)
+        X = np.concatenate(
+            (-np.ones((1, N)), X)
         )
 
-        w = np.random.random_sample((p, 1)) - .5
-        erro = True
+        w = np.random.random_sample((p + 1, 1))-.5
+        x_axis = np.linspace(np.min(X[1, :]), np.max(X[1, :]))
+        x2 = -w[1, 0]/w[2, 0]*x_axis + w[0, 0]/w[2, 0]
+        x2 = np.nan_to_num(x2)
+
+        error = True
         epoca = 0
-        while erro:
-            erro = False
+
+        while error and epoca < max_epocas:
+            error = False
             for t in range(N):
                 x_t = X[:, t].reshape(p+1, 1)
                 u_t = (w.T@x_t)[0, 0]
                 y_t = 1 if u_t >= 0 else -1
-                d_t = Y[0, t]
+                d_t = Y[t]
                 e_t = d_t - y_t
-                w = w + (etha*e_t*x_t)/2
-                erro = True if y_t != d_t else False
+                w = w + (etha*e_t*x_t) / 2
+                if (y_t != d_t):
+                    error = True
+            x2 = -w[1, 0]/w[2, 0]*x_axis + w[0, 0]/w[2, 0]
+            x2 = np.nan_to_num(x2)
             epoca += 1
 
+        x2 = -w[1, 0]/w[2, 0]*x_axis + w[0, 0]/w[2, 0]
+        x2 = np.nan_to_num(x2)
+
+        return x_axis, x2, w
+
     @staticmethod
-    def adaptive_linear_element():
+    def eqm(X, Y, w):
+        p_1, N = X.shape
+        eq = 0
+        for t in range(N):
+            x_t = X[:, t].reshape(p_1, 1)
+            u_t = w.T@x_t
+            d_t = Y[0, t]
+            eq += (d_t-u_t[0, 0])**2
+        return eq/(2*N)
+
+    @staticmethod
+    def adaptive_linear_element(X, Y, etha, max_epocas, precisao):
+        p, N = X.shape
+        X = np.concatenate(
+            (-np.ones((1, N)), X)
+        )
+
+        w = np.random.random_sample((p + 1, 1))-.5
+        x_axis = np.linspace(np.min(X[1, :]), np.max(X[1, :]))
+        x2 = -w[1, 0]/w[2, 0]*x_axis + w[0, 0]/w[2, 0]
+        x2 = np.nan_to_num(x2)
+
+        epoca = 0
+        EQM1 = 0
+        EQM2 = 0
+
+        while epoca < max_epocas and abs(EQM1 - EQM2) > precisao:
+            EQM1 = ModelsRNA.eqm(X, Y, w)
+            for t in range(N):
+                x_t = X[:, t:t+1]
+                u_t = (w.T@x_t)[0, 0]
+                d_t = Y[0, t]
+                e_t = d_t - u_t
+                w = w + etha*e_t*x_t
+            epoca += 1
+            EQM2 = ModelsRNA.eqm(X, Y, w)
+            x2 = -w[1, 0]/w[2, 0]*x_axis + w[0, 0]/w[2, 0]
+            x2 = np.nan_to_num(x2)
+
+        x2 = -w[1, 0]/w[2, 0]*x_axis + w[0, 0]/w[2, 0]
+        x2 = np.nan_to_num(x2)
+        return x_axis, x2, w
+
+    @staticmethod
+    def foward(X):
         pass
 
     @staticmethod
-    def perceptron_multipo():
+    def backward(X, d):
+        pass
+
+    @staticmethod
+    def perceptron_multipo(
+            X, Y, etha, max_epocas, qtd_cam, qtd_escolh, qtd_saida, precisao):
+        p, N = X.shape
+        X = np.concatenate(
+            (-np.ones((1, N)), X)
+        )
+        W = np.random.random_sample((p + 1, qtd_cam + 1))-.5
+        print(W)
         pass
 
 
@@ -88,11 +130,3 @@ class Validation:
         coppied_data = np.copy(self.data.data)
         for _ in range(R):
             np.random.shuffle(coppied_data.T)
-
-
-if __name__ == '__main__':
-    validate = Validation('spiral.csv')
-    data = Data('spiral.csv')
-    print(np.min(data.X[0, :]), np.max(data.X[0, :]))
-    print(np.min(data.X[1, :]), np.max(data.X[1, :]))
-    data.show_graph()

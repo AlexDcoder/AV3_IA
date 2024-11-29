@@ -1,6 +1,7 @@
 import os
 import cv2
 from pprint import pprint
+import numpy as np
 
 
 class DirFileExplorer:
@@ -27,32 +28,42 @@ class DirFileExplorer:
 
 
 class ClassFacial:
-    def __init__(self, file_name, witdth, height):
+    def __init__(self, file_name, C, witdth, height):
         self.data = DirFileExplorer(file_name)
+        self.C = C
+        self.X = np.empty((witdth*height, 0))
+        self.Y = np.empty((C, 0))
         self.matrix_dict = self.create_matrix_dict(witdth, height)
-
-    @staticmethod
-    def read_and_resize_img(imgs, widht, height):
-        matrix_list = []
-        for img in imgs:
-            img_matrix = cv2.imread(img, cv2.IMREAD_GRAYSCALE)
-            img_matrix = cv2.resize(img_matrix, (widht, height))
-            matrix_list.append(img_matrix)
-        return matrix_list
 
     def create_matrix_dict(self, widht, height):
         return {
             subdir: self.read_and_resize_img(
-                self.data.img_dirs[subdir], widht, height)
+                self.X, self.Y, self.C, self.data.img_dirs[subdir], widht,
+                height)
             for subdir in self.data.img_dirs.keys()
         }
 
+    @staticmethod
+    def read_and_resize_img(X, Y, C, imgs, widht, height):
+        matrix_list = []
+        for img in imgs:
+            img_matrix = cv2.imread(img, cv2.IMREAD_GRAYSCALE)
+            img_matrix = cv2.resize(img_matrix, (widht, height))
+            x = img_matrix.flatten()
+            X = np.concatenate((
+                X,
+                x.reshape(widht*height, 1)
+            ), axis=1)
+            y = -np.ones((C, 1))
+            Y = np.concatenate((
+                Y,
+                y
+            ), axis=1)
+
+            matrix_list.append([X, Y])
+        return matrix_list
+
 
 if __name__ == '__main__':
-    teste_com_10 = ClassFacial('RecFac', 10, 10)
-    teste_com_20 = ClassFacial('RecFac', 20, 20)
-    teste_com_30 = ClassFacial('RecFac', 30, 30)
-    teste_com_40 = ClassFacial('RecFac', 40, 40)
-    teste_com_50 = ClassFacial('RecFac', 50, 50)
-
-    pprint(teste_com_10.matrix_dict)
+    teste_com_10 = ClassFacial('RecFac', 20, 10, 10)
+    pprint(teste_com_10.matrix_dict['an2i'][0])
