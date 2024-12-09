@@ -78,6 +78,7 @@ while (erro):
         y_t = sign(u_t)
         d_t = float(Y[0, t])
         e_t = d_t - y_t
+        print(e_t)
         w = w + (lr*e_t*x_t)/2
         if (y_t != d_t):
             erro = True
@@ -87,8 +88,7 @@ while (erro):
     x2 = np.nan_to_num(x2)
     plt.plot(x_axis, x2, color='orange', alpha=.1)
     epoca += 1
-print(w)
-print(w.shape)
+
 # fim do treinamento
 x2 = -w[1, 0]/w[2, 0]*x_axis + w[0, 0]/w[2, 0]
 x2 = np.nan_to_num(x2)

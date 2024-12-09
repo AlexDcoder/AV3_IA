@@ -24,6 +24,9 @@ class ModelMLP:
         # Definindo número de neurônios por camada oculta
         self.q = np.copy(qs)
 
+        # Definindo quantidade de categorias
+        self.C = C
+
         # Definindo matriz de confusão
         self.matriz_conf = np.zeros((C, C))
 
@@ -53,11 +56,14 @@ class ModelMLP:
             eq += (d_t-u_t[0, 0])**2
         return eq/(2*N)
 
+    def sign(self, u_t):
+        return u_t
+
     def training(self, X_train: NDArray, Y_train: NDArray):
         # Criar uma lista (list) dos elementos: W, u, y, δ cada uma com L + 1 posições.
         grad_local = np.zeros((self.L + 1, 1))
         # Inicializar as L + 1 matrizes W com valores aleatórios pequenos (−0.5, 0.5).
-        W = np.random.random_sample((self.L + 1, 1))-.5
+        W = np.random.random_sample((self.L + 1, self.C))-.5
 
         # Adicionar o vetor linha de −1 na primeira linha da matriz de dados Xtreino, resultando em Xtreino ∈ R(p+1)×N
         p, N = X_train.shape
