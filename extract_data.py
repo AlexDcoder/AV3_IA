@@ -1,11 +1,16 @@
 # Optimized extract_data.py
 import os
+from typing import Any
 import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
+from numpy.typing import NDArray
+import pandas as pd
 from models.ada import ModelADALINE
+from models.mlp import ModelMLP
 from models.ps import ModelPS
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 class FileExplorer:
@@ -30,8 +35,8 @@ class MatrixData:
         self.data = FileExplorer(file_name)
         self.dimension = dimension
         self.C = C
-        self.X = None
-        self.Y = None
+        self.X: NDArray | None = None
+        self.Y: NDArray | None = None
         self.read_and_resize_img()
 
     def process_image(self, img, category_index):
@@ -66,15 +71,11 @@ class Montecarlo:
         self.percent_train = percent_train
 
     @staticmethod
-    def normalize_data(X: np.ndarray) -> np.ndarray:
+    def normalize_data(X: NDArray) -> NDArray:
         # More efficient normalization
         return 2 * (X - X.min()) / (X.max() - X.min()) - 1
 
     def execute(self, R: int, *hyperparameters):
-        from models.ps import ModelPS
-        from models.ada import ModelADALINE
-        from models.mlp import ModelMLP
-
         p, N = self.matrix_data.X.shape
 
         # Single normalization call
@@ -88,10 +89,12 @@ class Montecarlo:
         # Create models once
         ps = ModelPS(lr_ps, max_epoch_ps, C)
         ada = ModelADALINE(lr_ada, max_epoch_ada, precis_ada, C)
-        mlp = ModelMLP(lr_mlp, max_epoch_mlp, precis_mlp, L, m, qs, C)
+        # mlp = ModelMLP(lr_mlp, max_epoch_mlp, precis_mlp, L, m, qs, C)
 
         # Preallocate metrics list
-        metrics_ps, metrics_ada, metrics_mlp = [], [], []
+        metrics_ps: dict[float, Any] = {}
+        metrics_ada: dict[float, Any] = {}
+        # metrics_mlp: dict[float, Any] = {}
 
         # Vectorized data splitting and randomization
         for _ in range(R):
@@ -106,21 +109,64 @@ class Montecarlo:
             # Training and testing
             w_ps = ps.training(X_train, Y_train)
             w_ada = ada.training(X_train, Y_train)
-            w_mlp = mlp.training(X_train, Y_train)
+            # w_mlp = mlp.training(X_train, Y_train)
 
-            metrics_ps.append(ps.testing(X_test, Y_test, w_ps))
-            metrics_ada.append(ada.testing(X_test, Y_test, w_ada))
-            metrics_mlp.append(mlp.testing(X_test, Y_test, w_mlp))
+            mc_ps, acur_ps, lh_ps = ps.testing(X_test, Y_test, w_ps)
+            mc_ada, acur_ada, lh_ada = ada.testing(X_test, Y_test, w_ada)
+            # mc_mlp, acur_mlp, lh_mlp = mlp.testing(X_test, Y_test, w_ps)
 
-        return metrics_ps, metrics_ada, metrics_mlp
+            metrics_ps[acur_ps] = [mc_ps, lh_ps]
+            metrics_ada[acur_ada] = [mc_ada, lh_ada]
+            # metrics_mlp.append(mlp.testing(X_test, Y_test, w_mlp))
+
+        return pd.DataFrame({
+            "Modelos": ["Perceptron Simples", "ADAptive LINear Element",
+                        "Perceptron de Múltiplas Camadas"],
+            "Média": [
+                np.mean(list(metrics_ps.keys())),
+                np.mean(list(metrics_ada.keys())), 0],
+            "Desvio-Padrão": [
+                np.std(list(metrics_ps.keys())),
+                np.std(list(metrics_ada.keys())), 0],
+            "Maior Valor": [
+                np.max(list(metrics_ps.keys())),
+                np.max(list(metrics_ada.keys())), 0],
+            "Menor Valor": [
+                np.min(list(metrics_ps.keys())),
+                np.min(list(metrics_ada.keys())), 0],
+        })
+
+
+class Graph:
+    @ staticmethod
+    def show_heatmap(matriz_conf, rotulos: list[str]):
+        # Converte a matriz de confusão em um DataFrame
+        df_confusion = pd.DataFrame(
+            matriz_conf,
+            index=[rotulo for rotulo in rotulos],
+            columns=[rotulo for rotulo in rotulos]
+        )
+
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(df_confusion, annot=True, fmt=".0f",
+                    cmap="coolwarm", cbar=True)
+        plt.title("Matriz de Confusão")
+        plt.xlabel("Valores Preditos")
+        plt.ylabel("Valores Reais")
+        plt.tight_layout()
+        plt.show()
 
 
 if __name__ == '__main__':
-    data = MatrixData('RecFac', 20, 50)
-    model_1 = ModelADALINE(.01, 10**3, .01, 20)
+    print("Extraindo Informações")
+    data = MatrixData('RecFac', 20, 30)
+    # model_1 = ModelPS(10**-1, 10**4, data.C)
+    model_1 = ModelADALINE(.001, 10**5, .0001, data.C)
+    # model_1 = ModelMLP(10**-3, 10**3, .001, 20, 20, [], data.C)
 
     p, N = data.X.shape
     random_index = np.random.permutation(N)
+    data.X = Montecarlo.normalize_data(data.X)
     X = data.X[:, random_index]
     Y = data.Y[:, random_index]
 
@@ -131,5 +177,9 @@ if __name__ == '__main__':
     X_test = X[:, int(N*.8):]
     Y_test = Y[:, int(N*.8):]
     w_estim = model_1.training(X_train, Y_train)
-    print(w_estim)
     model_1.testing(X_test, Y_test, w_estim)
+
+    Graph.show_heatmap(model_1.matriz_conf, data.data.img_dirs.keys())
+
+    acur = model_1._show_metrics()
+    print(acur)

@@ -67,21 +67,16 @@ class ModelMLP:
 
         # Adicionar o vetor linha de −1 na primeira linha da matriz de dados Xtreino, resultando em Xtreino ∈ R(p+1)×N
         p, N = X_train.shape
-        X_train = np.concatenate(
-            (-np.ones((1, N)), X_train)
-        )
-        epoca = 0
-        EQM1 = 1
-        EQM2 = 0
-        while epoca < self.max_epoch and abs(EQM1 - EQM2) > self.precis:
-            # EQM1 = self.eqm(X_train, Y_train, w)
-            for t in range(N):
-                x_t = X_train[:, t]
-                self.foward(x_t)
-                d_t = Y_train[0, t]
-                self.backward(x_t, d_t)
-            epoca += 1
-            EQM2 = self.eqm(X_train, Y_train, W)
+        X_train_with_bias = np.vstack((-np.ones(N), X_train))
+
+        for epoca in range(self.max_epoch):
+            current_mse = self.mean_squared_error(
+                X_train_with_bias, Y_train, w)
+            self.foward(X_train_with_bias)
+            d_t = None
+            self.backward(X_train, d_t)
+            prev_mse = current_mse
+
         return W
 
     def testing(self, X_test: NDArray, Y_test: NDArray, w_estim: NDArray):
@@ -89,3 +84,6 @@ class ModelMLP:
         for t in range(N):
             x_t = X_test[:, t]
             self.foward(x_t)
+
+    def show_graphs(self):
+        pass

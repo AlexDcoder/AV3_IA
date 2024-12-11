@@ -1,160 +1,171 @@
 import numpy as np
 from numpy.typing import NDArray
+import matplotlib.pyplot as plt
+from typing import Tuple, List
 
 
 class ModelADALINE:
     def __init__(self, lr: float, max_epoch: int, precis: float, C: int):
-        # Learning rate
-        self.lr = lr
+        """
+        Inicializa o modelo ADALINE (Adaptive Linear Neuron)
 
-        # Maximum number of epochs
-        self.max_epoch = max_epoch
+        Args:
+            lr (float): Taxa de aprendizado
+            max_epoch (int): Número máximo de épocas de treinamento
+            precis (float): Precisão para critério de parada
+            C (int): Número de categorias/classes
+        """
+        # Taxa de aprendizado para atualização dos pesos
+        self.lr: float = lr
 
-        # Precision for stopping criterion
-        self.precis = precis
+        # Número máximo de iterações de treinamento
+        self.max_epoch: int = max_epoch
 
-        # Number of categories
-        self.C = C
+        # Precisão para determinar convergência
+        self.precis: float = precis
 
-        # Confusion matrix
-        self.matriz_conf = np.zeros((C, C))
+        # Número de categorias no problema de classificação
+        self.C: int = C
+
+        # Matriz de confusão para avaliar desempenho do modelo
+        self.matriz_conf: NDArray = np.zeros((C, C))
+
+        # Histórico de erro de aprendizado
+        self.learning_hist: List[float] = []
 
     @staticmethod
-    def mean_squared_error(X: NDArray, Y: NDArray, w: NDArray):
+    def mean_squared_error(X: NDArray, Y: NDArray, w: NDArray) -> float:
         """
-        Calculate Mean Squared Error
+        Calcula o Erro Quadrático Médio (MSE)
 
         Args:
-            X (NDArray): Input data with bias
-            Y (NDArray): Target data
-            w (NDArray): Weight matrix
+            X (NDArray): Dados de entrada com termo de bias
+            Y (NDArray): Dados de destino em codificação one-hot
+            w (NDArray): Matriz de pesos
 
         Returns:
-            float: Mean Squared Error
+            float: Erro Quadrático Médio
         """
-        p, N = X.shape
-        errors = []
+        # Obtém o número de amostras
+        _, N = X.shape
 
+        # Inicializa erro total
+        total_error: float = 0
+
+        # Computa erro para cada amostra
         for t in range(N):
-            x_t = X[:, t].reshape(p, 1)
-            u_t = w.T @ x_t
-            d_t = Y[:, t]
-            error = np.mean((d_t - u_t)**2)
-            errors.append(error)
+            x_t = X[:, t]
+            y_t = Y[:, t]
+            # Calcula vetor de predição
+            prediction = w.T @ x_t
+            # Computa erro quadrado para todas as classes
+            error = np.sum((y_t - prediction)**2)
+            total_error += error
 
-        return np.mean(errors)
+        # Calcula MSE
+        mse = total_error / (2 * N)
 
-    def training(self, X_train: NDArray, Y_train: NDArray):
+        return mse
+
+    def training(self, X_train: NDArray, Y_train: NDArray) -> NDArray:
         """
-        ADALINE Training Method
+        Método de treinamento do ADALINE
 
         Args:
-            X_train (NDArray): Training input data
-            Y_train (NDArray): Training target data
+            X_train (NDArray): Dados de entrada de treinamento
+            Y_train (NDArray): Dados de destino de treinamento
 
         Returns:
-            NDArray: Trained weight matrix
+            NDArray: Matriz de pesos treinada
         """
         p, N = X_train.shape
 
-        # Add bias term
+        # Adiciona termo de bias
         X_train_with_bias = np.vstack((-np.ones(N), X_train))
 
-        # Initialize weights randomly
+        # Inicializa pesos aleatoriamente
         w = np.random.uniform(-0.5, 0.5, (p + 1, self.C))
 
-        # Training loop
+        # Loop de treinamento
         epoch = 0
-        prev_mse = float('inf')
+        mse_1 = 1
+        mse_2 = 0
 
-        while epoch < self.max_epoch:
-            # Calculate current MSE
-            current_mse = self.mean_squared_error(
-                X_train_with_bias, Y_train, w)
+        # Critério de parada: máximo de épocas ou convergência
+        while epoch < self.max_epoch and abs(mse_1 - mse_2) > self.precis:
+            # Calcula MSE atual
+            mse_1 = self.mean_squared_error(X_train_with_bias, Y_train, w)
+            self.learning_hist.append(mse_1)
 
-            # Check stopping criterion
-            if abs(prev_mse - current_mse) <= self.precis:
-                break
+            # Atualização de pesos para cada amostra
+            for i in range(N):
+                x_t = X_train_with_bias[:, i:i+1]
+                u_t = w.T@x_t
+                d_t = Y_train[:, i:i+1]
+                e_t = d_t - u_t
+                w = w + self.lr*(x_t@e_t.T)
 
-            for t in range(N):
-                x_t = X_train_with_bias[:, t].reshape(
-                    p+1, 1)  # Shape: (p+1, 1)
-                u_t = w.T @ x_t  # Shape: (C, 1)
-                d_t = Y_train[:, t]  # Shape: (C, 1)
-
-                # Delta rule weight update
-                error = d_t - u_t  # Shape: (C, 1)
-                # Shape of x_t.T is (1, p+1), so this works for broadcasting
-                w += self.lr * error * x_t.T
-
-            prev_mse = current_mse
+            # Calcula novo MSE
+            mse_2 = self.mean_squared_error(X_train_with_bias, Y_train, w)
             epoch += 1
 
         return w
 
-    def update_model_precision(self, y_estim: int, d_t: int):
+    def update_model_precision(self, y_estim: int, d_t: int) -> None:
         """
-        Update confusion matrix
+        Atualiza matriz de confusão
 
         Args:
-            y_estim (int): Estimated class
-            d_t (int): True class
+            y_estim (int): Classe estimada
+            d_t (int): Classe verdadeira
         """
-        self.matriz_conf[y_estim, d_t] += 1
-        if y_estim != d_t:
-            self.matriz_conf[d_t, y_estim] += 1
+        self.matriz_conf[d_t, y_estim] += 1
 
-    def show_metrics(self):
+    def _show_metrics(self) -> float:
         """
-        Calculate performance metrics
+        Calcula métricas de desempenho
 
         Returns:
-            tuple: Accuracy, Sensitivity, Specificity
+            float: Acurácia do modelo
         """
         total = self.matriz_conf.sum()
         true_positives = np.diag(self.matriz_conf)
-        false_negatives = self.matriz_conf.sum(axis=1) - true_positives
-        false_positives = self.matriz_conf.sum(axis=0) - true_positives
-        true_negatives = total - \
-            (true_positives + false_negatives + false_positives)
-
         accuracy = true_positives.sum() / total
-        sensitivity = np.mean(
-            true_positives / (true_positives + false_negatives))
-        specificity = np.mean(
-            true_negatives / (true_negatives + false_positives))
 
-        return accuracy, sensitivity, specificity
+        return accuracy
 
-    def testing(self, X_test: NDArray, Y_test: NDArray, w_estim: NDArray):
+    def testing(self, X_test: NDArray, Y_test: NDArray, w_estim: NDArray) -> Tuple[NDArray, float, List[float]]:
         """
-        Model Testing Method
+        Método de teste do modelo
 
         Args:
-            X_test (NDArray): Test input data
-            Y_test (NDArray): Test target data
-            w_estim (NDArray): Estimated weights
+            X_test (NDArray): Dados de entrada de teste
+            Y_test (NDArray): Dados de destino de teste
+            w_estim (NDArray): Pesos estimados
 
         Returns:
-            tuple: Performance metrics
+            Tuple contendo:
+            - Matriz de confusão
+            - Acurácia
+            - Histórico de aprendizado
         """
         p, N = X_test.shape
 
-        # Add bias term
+        # Adiciona termo de bias
         X_test_with_bias = np.vstack((-np.ones(N), X_test))
 
-        # Reset confusion matrix
+        # Reinicia matriz de confusão
         self.matriz_conf = np.zeros((self.C, self.C))
 
-        # Predict and update confusion matrix
+        # Predição e atualização da matriz de confusão
         for t in range(N):
             x_t = X_test_with_bias[:, t].reshape(p+1, 1)
             u_t = w_estim.T @ x_t
 
-            # Multiclass prediction
+            # Predição multiclasse
             y_t = np.argmax(u_t)
             d_t = np.argmax(Y_test[:, t])
 
-            self.update_model_precision(y_t, d_t)
+            self.update_model_precision(int(y_t), int(d_t))
 
-        return self.show_metrics()
+        return self.matriz_conf, self._show_metrics(), self.learning_hist
