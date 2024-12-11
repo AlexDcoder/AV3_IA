@@ -30,9 +30,6 @@ class ModelADALINE:
         # Matriz de confusão para avaliar desempenho do modelo
         self.matriz_conf: NDArray = np.zeros((C, C))
 
-        # Histórico de erro de aprendizado
-        self.learning_hist: List[float] = []
-
     @staticmethod
     def mean_squared_error(X: NDArray, Y: NDArray, w: NDArray) -> float:
         """
@@ -95,7 +92,7 @@ class ModelADALINE:
         while epoch < self.max_epoch and abs(mse_1 - mse_2) > self.precis:
             # Calcula MSE atual
             mse_1 = self.mean_squared_error(X_train_with_bias, Y_train, w)
-            self.learning_hist.append(mse_1)
+            self.learning_hist.append(float(mse_1))
 
             # Atualização de pesos para cada amostra
             for i in range(N):
@@ -108,7 +105,7 @@ class ModelADALINE:
             # Calcula novo MSE
             mse_2 = self.mean_squared_error(X_train_with_bias, Y_train, w)
             epoch += 1
-
+        self.learning_hist.append(mse_2)
         return w
 
     def update_model_precision(self, y_estim: int, d_t: int) -> None:

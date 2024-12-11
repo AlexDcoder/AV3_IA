@@ -94,9 +94,6 @@ class ModelPS:
                 # Acumula erro quadrático
                 epoch_errors += e_t**2
 
-            # Armazena histórico de erros da época
-            self.learning_hist.append(epoch_errors)
-
             # Incrementa contador de épocas
             epoch += 1
 

@@ -42,8 +42,12 @@ class ModelMLP:
         pass
 
     @staticmethod
-    def sigmoid(u):
-        return (1 - np.exp(-u)) / (1 + np.exp(-u))
+    def tanh(u):
+        return np.tanh(u)
+
+    @staticmethod
+    def tanh_derivative(output):
+        return 1 - output ** 2
 
     @staticmethod
     def eqm(X: NDArray, Y: NDArray, w: NDArray):

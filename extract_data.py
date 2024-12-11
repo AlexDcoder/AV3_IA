@@ -84,6 +84,7 @@ class Montecarlo:
         # Unpack hyperparameters more efficiently
         lr_ps, max_epoch_ps, lr_ada, max_epoch_ada, precis_ada, \
             lr_mlp, max_epoch_mlp, precis_mlp, L, m, qs = hyperparameters[:12]
+
         C = self.matrix_data.C
 
         # Create models once
@@ -160,8 +161,8 @@ class Graph:
 if __name__ == '__main__':
     print("Extraindo Informações")
     data = MatrixData('RecFac', 20, 30)
-    # model_1 = ModelPS(10**-1, 10**4, data.C)
-    model_1 = ModelADALINE(.001, 10**5, .0001, data.C)
+    model_1 = ModelPS(10**-1, 10**4, data.C)
+    # model_1 = ModelADALINE(.001, 10**5, .0001, data.C)
     # model_1 = ModelMLP(10**-3, 10**3, .001, 20, 20, [], data.C)
 
     p, N = data.X.shape
@@ -179,7 +180,7 @@ if __name__ == '__main__':
     w_estim = model_1.training(X_train, Y_train)
     model_1.testing(X_test, Y_test, w_estim)
 
-    Graph.show_heatmap(model_1.matriz_conf, data.data.img_dirs.keys())
-
+    # Graph.show_heatmap(model_1.matriz_conf, data.data.img_dirs.keys())
+    plt.plot(model_1.learning_hist)
     acur = model_1._show_metrics()
     print(acur)
